@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบจัดตารางกะทำงานอัตโนมัติ</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght=300;400;600;700&display=swap');
+        body { font-family: 'Sarabun', sans-serif; }
+        .custom-scrollbar::-webkit-scrollbar { height: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-slate-50 p-4 md:p-8">
+
+    <div id="login-modal" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-md"></div>
+        
+        <div class="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl relative z-10 border border-slate-100 text-center transform scale-100 transition-all">
+            <div class="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 shadow-sm animate-pulse">
+                🔒
+            </div>
+            <h3 class="text-xl font-bold text-slate-800 mb-1">ยินดีต้อนรับเข้าสู่ระบบ</h3>
+            <p class="text-slate-500 text-xs mb-5">กรุณากรอกรหัสผ่านเพื่อเข้าใช้งานตารางทำงาน</p>
+            
+            <div class="relative mb-4">
+                <input type="password" id="login-password" placeholder="ระบุรหัสผ่าน..." 
+                       onkeydown="if(event.key === 'Enter') checkPassword()"
+                       class="w-full bg-slate-50 px-4 py-3 pr-10 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all text-center font-medium tracking-wide text-slate-800">
+                <button onclick="togglePasswordVisibility()" type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none text-sm cursor-pointer p-1" title="ดูรหัสผ่าน">
+                    <span id="eye-icon">👁️</span>
+                </button>
+            </div>
+            
+            <p id="login-error-msg" class="text-xs text-red-500 font-semibold mb-4 hidden animate-shake">❌ รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง</p>
+            
+            <button onclick="checkPassword()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm py-3 rounded-xl shadow-md shadow-blue-500/20 transition active:scale-[0.98] cursor-pointer">
+                เข้าสู่ระบบ 🚀
+            </button>
+        </div>
+    </div>
+
+    <div class="max-w-full mx-auto bg-white p-6 rounded-2xl shadow-xl">
+        <div class="flex flex-col md:flex-row md:items-center justify-between border-b pb-6 mb-6 gap-4">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-800">📅 ระบบจัดตารางกะทำงานอัตโนมัติ</h1>
+                <div id="autosave-status" class="text-xs text-slate-400 mt-1 flex items-center gap-1.5 font-medium">
+                    <span class="inline-block w-2 h-2 rounded-full bg-slate-300"></span> ระบบสแตนด์บาย...
+                </div>
+            </div>
+            
+            <div class="flex flex-wrap items-center gap-3 bg-slate-100 p-2 rounded-xl">
+                <div class="flex items-center gap-1">
+                    <span class="text-xs font-bold text-gray-600 pl-1">จำนวนวันของเดือน:</span>
+                    <select id="days-select" onchange="onSettingChange()" class="bg-white px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="28">28 วัน</option>
+                        <option value="29">29 วัน</option>
+                        <option value="30">30 วัน</option>
+                        <option value="31" selected>31 วัน</option>
+                    </select>
+                </div>
+                <div class="flex items-center gap-1">
+                    <span class="text-xs font-bold text-gray-600">วันที่ 1 ตรงกับวัน:</span>
+                    <select id="first-day-select" onchange="onSettingChange()" class="bg-white px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="0">อาทิตย์</option>
+                        <option value="1">จันทร์</option>
+                        <option value="2">อังคาร</option>
+                        <option value="3">พุธ</option>
+                        <option value="4">พฤหัสบดี</option>
+                        <option value="5">ศุกร์</option>
+                        <option value="6">เสาร์</option>
+                    </select>
+                </div>
+                <span class="text-[10px] font-bold tracking-wider text-slate-400 uppercase pr-1">RiD Finity Create</span>
+            </div>
+        </div>
+
+        <div class="mb-6 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+            <div class="w-full flex flex-col items-center justify-center mb-5">
+                <div class="text-sm md:text-base font-bold text-slate-700 mb-2.5 flex items-center gap-2">
+                    <span>🗓️</span><span>เลือกประเภทตารางกะ</span>
+                </div>
+                <div class="flex items-center justify-center gap-2 bg-white rounded-2xl p-1.5 border-2 border-slate-200 shadow-md">
+                    <button id="mode-daily-btn" type="button" onclick="setScheduleMode('daily')" class="px-6 md:px-8 py-2.5 rounded-xl text-sm md:text-base font-bold transition-all duration-200">ตารางกะรายวัน</button>
+                    <button id="mode-monthly-btn" type="button" onclick="setScheduleMode('monthly')" class="px-6 md:px-8 py-2.5 rounded-xl text-sm md:text-base font-bold transition-all duration-200">ตารางกะรายเดือน</button>
+                </div>
+            </div>
+
+            <div class="border-t border-slate-200 pt-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div class="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
+                    <div class="text-sm font-bold text-gray-700 flex items-center gap-1 shrink-0 w-full sm:w-auto">👥 จัดการพนักงาน:</div>
+                    <div class="w-full sm:w-auto flex gap-2">
+                        <input type="text" id="new-staff-name" placeholder="ระบุชื่อพนักงานใหม่..." class="w-full sm:w-64 bg-white px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <button onclick="addStaff()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-1.5 rounded-lg transition shrink-0 shadow-sm cursor-pointer">+ เพิ่มพนักงาน</button>
+                    </div>
+                </div>
+
+                <div class="w-full lg:w-auto flex justify-end">
+                    <button onclick="runAutosave()" class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-5 py-2 rounded-lg transition shadow-md shadow-emerald-600/10 active:scale-[0.98] cursor-pointer flex items-center justify-center gap-1.5">
+                        💾 บันทึกข้อมูลไปยังคลาวด์
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto custom-scrollbar border rounded-xl shadow-sm">
+            <table class="w-full text-left border-collapse bg-white">
+                <thead id="table-head">
+                </thead>
+                <tbody id="table-body" class="divide-y divide-gray-200">
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+    <script>
+        // ================= ฟังก์ชันส่วนจัดการรหัสผ่านเข้าใช้งานโปรแกรม =================
+        function togglePasswordVisibility() {
+            const passwordInput = document.getElementById('login-password');
+            const eyeIcon = document.getElementById('eye-icon');
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                eyeIcon.innerText = '🙈';
+            } else {
+                passwordInput.type = 'password';
+                eyeIcon.innerText = '👁️';
+            }
+        }
+
+        function checkPassword() {
+            const passwordInput = document.getElementById('login-password');
+            const errorMsg = document.getElementById('login-error-msg');
+            const loginModal = document.getElementById('login-modal');
+
+            if (passwordInput.value === 'punpun') {
+                errorMsg.classList.add('hidden');
+                loginModal.classList.add('hidden');
+                loadPreviousSavedData();
+            } else {
+                errorMsg.classList.remove('hidden');
+                passwordInput.value = '';
+                passwordInput.focus();
+            }
+        }
+        // =====================================================================
+
+        // โครงสร้างพนักงานเดิม: เก็บชื่อ, วันหยุดหลัก และกะแรกของเดือน
+        let staffList = [
+            { name: "สมชาย ใจดี", defaultOff: 6, defaultShift: "ดึก1" },
+            { name: "สมหญิง รักงาน", defaultOff: 0, defaultShift: "บ่าย1" },
+            { name: "วิชัย มุ่งมั่น", defaultOff: 1, defaultShift: "เช้า1" }
+        ];
+
+        const thDays = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
+        const fullThDays = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
+        const shiftCycle = ["ดึก1", "ดึก2", "บ่าย1", "บ่าย2", "เช้า1", "เช้า2"];
+
+        // daily  = หยุด 1 วันต่อรอบสัปดาห์
+        // monthly = หยุด 2 วันติดกัน โดยวันที่สองคือวันถัดจากวันหยุดหลักอัตโนมัติ
+        let scheduleMode = 'daily';
+
+        function setScheduleMode(mode, shouldRender = true) {
+            scheduleMode = mode === 'monthly' ? 'monthly' : 'daily';
+            updateModeButtons();
+            if (shouldRender) renderCalendar(false);
+        }
+
+        function updateModeButtons() {
+            const dailyBtn = document.getElementById('mode-daily-btn');
+            const monthlyBtn = document.getElementById('mode-monthly-btn');
+            if (!dailyBtn || !monthlyBtn) return;
+
+            const base = 'px-6 md:px-8 py-2.5 rounded-xl text-sm md:text-base font-bold transition-all duration-200 cursor-pointer';
+            const active = 'bg-blue-600 text-white shadow-lg shadow-blue-500/25 ring-2 ring-blue-200 scale-[1.02]';
+            const inactive = 'bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700';
+            dailyBtn.className = `${base} ${scheduleMode === 'daily' ? active : inactive}`;
+            monthlyBtn.className = `${base} ${scheduleMode === 'monthly' ? active : inactive}`;
+        }
+
+        // คำนวณวันในสัปดาห์ (0-6) ตามลำดับวันที่กำหนดและวันเริ่มต้น
+        function getDayOfWeek(dayNum) {
+            const firstDayOfWeek = parseInt(document.getElementById('first-day-select').value);
+            return (firstDayOfWeek + (dayNum - 1)) % 7;
+        }
+
+        // ตรวจวันหยุดตามโหมดที่เลือก
+        function isOffDay(dayOfWeek, primaryOffDay) {
+            if (dayOfWeek === primaryOffDay) return true;
+            if (scheduleMode === 'monthly') {
+                const nextOffDay = (primaryOffDay + 1) % 7;
+                return dayOfWeek === nextOffDay;
+            }
+            return false;
+        }
+
+        function getOffDayLabel(primaryOffDay) {
+            if (scheduleMode === 'monthly') {
+                const secondOffDay = (primaryOffDay + 1) % 7;
+                return `📅 วัน${fullThDays[primaryOffDay]} + วัน${fullThDays[secondOffDay]}`;
+            }
+            return `📅 วัน${fullThDays[primaryOffDay]}`;
+        }
+
+        // คงเวลา "กะมาตรฐาน" เดิมไว้ แต่ไม่มีการเพิ่ม/ลดเวลาจาก ก่อน/หลัง อีกต่อไป
+        function getBaseShiftTimeRange(shiftName) {
+            if (shiftName.startsWith('ดึก')) return '23.00-7.00';
+            if (shiftName.startsWith('บ่าย')) return '15.00-23.00';
+            if (shiftName.startsWith('เช้า')) return '7.00-15.00';
+            return '-';
+        }
+
+        function addStaff() {
+            const input = document.getElementById('new-staff-name');
+            const name = input.value.trim();
+            if (name === '') return;
+
+            staffList.push({
+                name: name,
+                defaultOff: 0,
+                defaultShift: 'เช้า1'
+            });
+
+            input.value = '';
+            renderCalendar();
+        }
+
+        function removeStaff(idx) {
+            if (confirm(`คุณต้องการลบพนักงานชื่อ "${staffList[idx].name}" ออกจากระบบใช่หรือไม่?`)) {
+                staffList.splice(idx, 1);
+                renderCalendar();
+            }
+        }
+
+        function updateStaffName(idx, value) {
+            staffList[idx].name = value.trim() || `พนักงานคนที่ ${idx + 1}`;
+        }
+
+        function onSettingChange() {
+            renderCalendar(false);
+        }
+
+        function renderCalendar(isFromLoad = false) {
+            const daysInMonth = parseInt(document.getElementById('days-select').value);
+            const tableHead = document.getElementById('table-head');
+            const tableBody = document.getElementById('table-body');
+
+            updateModeButtons();
+
+            let headHtml = `<tr class="bg-slate-800 text-white text-xs">
+                <th class="p-3 sticky left-0 bg-slate-800 z-20 min-w-[210px] max-w-[210px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.3)] text-center">พนักงาน</th>
+                <th class="p-3 bg-slate-700 min-w-[130px] border-r border-slate-600 text-center text-blue-300">กะแรกของเดือน</th>
+                <th class="p-3 bg-slate-700 min-w-[190px] border-r border-slate-600 text-center text-amber-300">วันหยุดประจำสัปดาห์</th>`;
+
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dayOfWeek = getDayOfWeek(d);
+                const dayName = thDays[dayOfWeek];
+                // หัวตารางแดงเฉพาะวันอาทิตย์เท่านั้น ไม่ผูกกับจำนวนพนักงานที่หยุด
+                const bgClass = dayOfWeek === 0 ? 'bg-red-600 text-white' : 'bg-slate-700 text-slate-200';
+
+                headHtml += `<th id="th-day-${d}" class="p-2 border-r border-slate-600 text-center min-w-[72px] ${bgClass}">
+                    <div class="text-[10px] font-medium opacity-80">${dayName}</div>
+                    <div class="text-xs font-bold">${d}</div>
+                </th>`;
+            }
+            headHtml += `</tr>`;
+            tableHead.innerHTML = headHtml;
+
+            let bodyHtml = '';
+            staffList.forEach((staff, staffIdx) => {
+                bodyHtml += `<tr class="hover:bg-slate-50 transition-colors">
+                    <td class="p-3 bg-white sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] border-r border-gray-200">
+                        <div class="flex items-center justify-between gap-1">
+                            <input type="text" value="${staff.name}" onchange="updateStaffName(${staffIdx}, this.value)" class="font-bold text-gray-800 text-sm bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none py-0.5 px-1 w-full rounded">
+                            <button onclick="removeStaff(${staffIdx})" class="text-gray-300 hover:text-red-500 transition text-xs cursor-pointer p-1" title="ลบพนักงาน">🗑️</button>
+                        </div>
+                    </td>
+                    <td class="p-2 bg-blue-50/40 border-r border-gray-200 text-center">
+                        <select onchange="autoGenerateMonth()" id="start-shift-select-${staffIdx}" class="w-full p-1 text-xs border border-blue-300 bg-white rounded font-bold text-blue-800 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                            <option value="ดึก1" ${staff.defaultShift === 'ดึก1' ? 'selected' : ''}>🌙 ดึก1</option>
+                            <option value="ดึก2" ${staff.defaultShift === 'ดึก2' ? 'selected' : ''}>🌙 ดึก2</option>
+                            <option value="บ่าย1" ${staff.defaultShift === 'บ่าย1' ? 'selected' : ''}>⛅ บ่าย1</option>
+                            <option value="บ่าย2" ${staff.defaultShift === 'บ่าย2' ? 'selected' : ''}>⛅ บ่าย2</option>
+                            <option value="เช้า1" ${staff.defaultShift === 'เช้า1' ? 'selected' : ''}>☀️ เช้า1</option>
+                            <option value="เช้า2" ${staff.defaultShift === 'เช้า2' ? 'selected' : ''}>☀️ เช้า2</option>
+                        </select>
+                    </td>
+                    <td class="p-2 bg-amber-50/70 border-r border-gray-200 text-center">
+                        <select onchange="autoGenerateMonth()" id="off-day-select-${staffIdx}" class="w-full p-1 text-xs border border-amber-300 bg-white rounded font-semibold text-amber-800 focus:outline-none focus:ring-1 focus:ring-amber-500">
+                            ${fullThDays.map((dayText, dayVal) => `<option value="${dayVal}" ${dayVal === staff.defaultOff ? 'selected' : ''}>📅 วัน${dayText}</option>`).join('')}
+                        </select>
+                    </td>`;
+
+                for (let d = 1; d <= daysInMonth; d++) {
+                    bodyHtml += `
+                    <td id="cell-${staffIdx}-${d}" class="p-2 border-r border-gray-100 text-center transition-all duration-300">
+                        <div id="shift-area-${staffIdx}-${d}">
+                            <div id="shift-text-${staffIdx}-${d}" class="text-xs font-bold text-gray-700 py-1 rounded">-</div>
+                        </div>
+                    </td>`;
+                }
+                bodyHtml += `</tr>`;
+            });
+
+            tableBody.innerHTML = bodyHtml;
+            autoGenerateMonth();
+        }
+
+        function autoGenerateMonth() {
+            const daysInMonth = parseInt(document.getElementById('days-select').value);
+
+            staffList.forEach((staff, staffIdx) => {
+                const offDaySelect = document.getElementById(`off-day-select-${staffIdx}`);
+                if (!offDaySelect) return;
+                const offDayValue = parseInt(offDaySelect.value);
+                staff.defaultOff = offDayValue;
+
+
+                const initialShiftSelect = document.getElementById(`start-shift-select-${staffIdx}`);
+                let currentShiftIdx = initialShiftSelect ? shiftCycle.indexOf(initialShiftSelect.value) : 0;
+                if (currentShiftIdx === -1) currentShiftIdx = 0;
+                if (initialShiftSelect) staff.defaultShift = initialShiftSelect.value;
+
+                let wasOff = false;
+                let isDay1Off = isOffDay(getDayOfWeek(1), offDayValue);
+                let savedDay2Value = 'ดึก2';
+                const day2SelectElement = document.getElementById(`day2-select-${staffIdx}`);
+                if (day2SelectElement) savedDay2Value = day2SelectElement.value;
+
+                for (let d = 1; d <= daysInMonth; d++) {
+                    const currentDayOfWeek = getDayOfWeek(d);
+                    const tdCell = document.getElementById(`cell-${staffIdx}-${d}`);
+                    const shiftArea = document.getElementById(`shift-area-${staffIdx}-${d}`);
+                    if (!shiftArea) continue;
+
+                    const offToday = isOffDay(currentDayOfWeek, offDayValue);
+                    if (offToday) {
+                        shiftArea.innerHTML = `<div id="shift-text-${staffIdx}-${d}" class="text-[11px] bg-red-100 text-red-700 font-bold py-1 rounded text-center">❌ วันหยุด</div>`;
+                        if (tdCell) tdCell.className = 'p-2 border-r border-gray-100 text-center bg-red-50/50';
+                        wasOff = true;
+                        continue;
+                    }
+
+                    // เปลี่ยนกะ 1 ขั้นหลังจบชุดวันหยุด ไม่ว่าจะเป็น 1 วันหรือ 2 วันต่อเนื่อง
+                    if (wasOff) {
+                        currentShiftIdx = (currentShiftIdx + 1) % shiftCycle.length;
+                        wasOff = false;
+                    }
+
+                    // คงพฤติกรรมเดิมกรณีวันที่ 1 เป็นวันหยุดและวันที่ 2 เป็นวันทำงาน
+                    // ในโหมดรายเดือน ถ้าวันที่ 2 เป็นวันหยุดต่อเนื่อง จะไม่สร้างตัวเลือกนี้
+                    if (d === 2 && isDay1Off && !isOffDay(currentDayOfWeek, offDayValue)) {
+                        const chosenDay2Shift = savedDay2Value;
+                        const finalRangeStr = getBaseShiftTimeRange(chosenDay2Shift);
+                        shiftArea.innerHTML = `
+                            <select onchange="autoGenerateMonth()" id="day2-select-${staffIdx}" class="w-full p-0.5 text-[11px] border border-blue-400 bg-white rounded font-bold text-center text-blue-700 focus:outline-none">
+                                <option value="ดึก1" ${savedDay2Value === 'ดึก1' ? 'selected' : ''}>🌙 ดึก1</option>
+                                <option value="ดึก2" ${savedDay2Value === 'ดึก2' ? 'selected' : ''}>🌙 ดึก2</option>
+                                <option value="บ่าย1" ${savedDay2Value === 'บ่าย1' ? 'selected' : ''}>⛅ บ่าย1</option>
+                                <option value="บ่าย2" ${savedDay2Value === 'บ่าย2' ? 'selected' : ''}>⛅ บ่าย2</option>
+                                <option value="เช้า1" ${savedDay2Value === 'เช้า1' ? 'selected' : ''}>☀️ เช้า1</option>
+                                <option value="เช้า2" ${savedDay2Value === 'เช้า2' ? 'selected' : ''}>☀️ เช้า2</option>
+                            </select>
+                            <div class="text-[9px] font-bold text-slate-500 tracking-tighter mt-0.5 bg-slate-100 rounded">${finalRangeStr}</div>`;
+                        const updatedDay2Shift = document.getElementById(`day2-select-${staffIdx}`).value;
+                        currentShiftIdx = shiftCycle.indexOf(updatedDay2Shift);
+                    } else {
+                        const currentShiftName = shiftCycle[currentShiftIdx];
+                        let displayIcon = '☀️';
+                        let colorClass = 'text-emerald-700 bg-emerald-50';
+                        if (currentShiftName.startsWith('ดึก')) {
+                            displayIcon = '🌙';
+                            colorClass = 'text-blue-700 bg-blue-50';
+                        } else if (currentShiftName.startsWith('บ่าย')) {
+                            displayIcon = '⛅';
+                            colorClass = 'text-amber-700 bg-amber-50';
+                        }
+
+                        const finalRangeStr = getBaseShiftTimeRange(currentShiftName);
+                        shiftArea.innerHTML = `
+                            <div id="shift-text-${staffIdx}-${d}" class="text-[11px] font-bold ${colorClass} py-0.5 rounded text-center shadow-sm">
+                                ${displayIcon} ${currentShiftName}
+                            </div>
+                            <div class="text-[9px] font-bold text-slate-500 tracking-tighter mt-0.5 bg-slate-100 rounded">${finalRangeStr}</div>`;
+                    }
+
+                    if (tdCell) tdCell.className = 'p-2 border-r border-gray-100 text-center';
+                }
+            });
+        }
+
+        // ================= ฟังก์ชันส่วนการจัดการบันทึกและโหลดข้อมูลคลาวด์ =================
+        // เมื่อสร้าง Google Sheet / Apps Script ชุดใหม่ ให้เปลี่ยน URL ที่บรรทัดนี้เพียงจุดเดียว
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzDbwrf9Sz3m0qWZ9KWcLBzOQfbJzq_z6M0vlD37TkcSwBONfFylO6U1XP9JprLjmny/exec";
+
+        async function runAutosave() {
+            const statusIndicator = document.getElementById('autosave-status');
+            if (statusIndicator) {
+                statusIndicator.innerHTML = `<span class="inline-block w-2 h-2 rounded-full bg-amber-500 animate-ping"></span> กำลังบันทึกข้อมูลไปยังระบบคลาวด์อัตโนมัติ...`;
+            }
+
+            const fullDataLog = {
+                password: 'punpun',
+                totalDays: document.getElementById('days-select').value,
+                firstDayOfWeek: document.getElementById('first-day-select').value,
+                scheduleMode: scheduleMode,
+                staffList: staffList
+            };
+
+            try {
+                await fetch(WEB_APP_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify(fullDataLog)
+                });
+
+                if (statusIndicator) {
+                    const now = new Date();
+                    const timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0') + ':' + now.getSeconds().toString().padStart(2, '0');
+                    statusIndicator.innerHTML = `<span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span> บันทึกสำเร็จล่าสุดเมื่อเวลา ${timeStr}`;
+                }
+            } catch (error) {
+                console.error('Autosave error: ', error);
+                if (statusIndicator) {
+                    statusIndicator.innerHTML = `<span class="inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse"></span> บันทึกล้มเหลว กำลังใช้หน่วยความจำสำรองชั่วคราว`;
+                }
+            }
+        }
+
+        async function loadPreviousSavedData() {
+            const statusIndicator = document.getElementById('autosave-status');
+            if (statusIndicator) {
+                statusIndicator.innerHTML = `<span class="inline-block w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span> กำลังดึงข้อมูลจากระบบหลัก...`;
+            }
+
+            try {
+                const response = await fetch(`${WEB_APP_URL}?action=loadLatest`);
+                const result = await response.json();
+
+                if (result.status === 'success' && result.data) {
+                    if (result.data.totalDays) document.getElementById('days-select').value = result.data.totalDays;
+                    if (result.data.firstDayOfWeek !== undefined && result.data.firstDayOfWeek !== null) {
+                        document.getElementById('first-day-select').value = result.data.firstDayOfWeek;
+                    }
+                    if (result.data.scheduleMode) {
+                        scheduleMode = result.data.scheduleMode === 'monthly' ? 'monthly' : 'daily';
+                    }
+                    if (result.data.staffList && result.data.staffList.length > 0) {
+                        staffList = result.data.staffList;
+                    }
+
+                    renderCalendar(true);
+                    if (statusIndicator) {
+                        statusIndicator.innerHTML = `<span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span> ซิงค์สถานะล่าสุดเรียบร้อยแล้ว`;
+                    }
+                } else {
+                    renderCalendar(false);
+                    if (statusIndicator) statusIndicator.innerHTML = `<span class="inline-block w-2 h-2 rounded-full bg-slate-400"></span> ไม่พบข้อมูลเดิม เริ่มต้นตารางใหม่`;
+                }
+            } catch (error) {
+                console.error('Load data error: ', error);
+                renderCalendar(false);
+                if (statusIndicator) statusIndicator.innerHTML = `<span class="inline-block w-2 h-2 rounded-full bg-red-400"></span> เชื่อมโยงข้อมูลล้มเหลว ใช้ฐานข้อมูลเครื่องหลัก`;
+            }
+        }
+
+        setInterval(runAutosave, 60000);
+        updateModeButtons();
+        // =====================================================================
+    </script>
+</body>
+</html>
